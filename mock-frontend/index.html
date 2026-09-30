@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>mock-frontend · CORS 확인</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 20px; }
+    .row { display: flex; gap: 8px; margin: 12px 0; }
+    input { flex: 1; padding: 8px; font-size: 14px; }
+    button { padding: 8px 12px; font-size: 14px; cursor: pointer; }
+    pre { background: #f4f4f5; padding: 12px; border-radius: 8px; white-space: pre-wrap; min-height: 48px; }
+    .error { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <h1>mock-frontend (http://localhost:5173)</h1>
+  <p>백엔드(http://localhost:8080)에 fetch를 보낸다. 결과와 오류는 아래와 개발자 도구 Console에 함께 찍힌다.</p>
+
+  <div class="row"><input id="nickname" value="수현"><button onclick="call('/members/nickname/' + encodeURIComponent(v('nickname')))">닉네임 중복 체크</button></div>
+  <div class="row"><input id="email" value="noco@umc.com"><button onclick="call('/members/email/' + encodeURIComponent(v('email')))">이메일 중복 체크</button></div>
+  <div class="row"><input id="memberId" value="1"><button onclick="call('/members/' + v('memberId') + '/ratings')">유저별 평점 조회</button></div>
+
+  <pre id="result">버튼을 눌러 보세요.</pre>
+
+  <script>
+    const API = 'http://localhost:8080';
+    const v = (id) => document.getElementById(id).value.trim();
+    const out = document.getElementById('result');
+
+    async function call(path) {
+      out.className = '';
+      out.textContent = `GET ${API}${path} ...`;
+      try {
+        const res = await fetch(API + path);
+        const body = await res.json();
+        console.log(res.status, body);
+        out.textContent = `${res.status}\n${JSON.stringify(body, null, 2)}`;
+      } catch (e) {
+        // CORS에 막히면 서버는 응답했어도 JavaScript는 TypeError: Failed to fetch만 받는다.
+        // 진짜 원인(Access-Control-Allow-Origin 없음)은 Console의 빨간 줄에서 볼 수 있다.
+        console.error(e);
+        out.className = 'error';
+        out.textContent = `요청 실패: ${e.message}\n→ 개발자 도구 Console에서 CORS 오류를 확인하세요.`;
+      }
+    }
+
+    // 캡처 자동화용: 주소 끝에 #auto를 붙이면 첫 번째 버튼을 누른 것과 같다.
+    if (location.hash === '#auto') call('/members/nickname/' + encodeURIComponent(v('nickname')));
+  </script>
+</body>
+</html>

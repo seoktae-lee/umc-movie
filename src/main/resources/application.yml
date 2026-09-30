@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/umc_movie
+    username: root
+    # 비밀번호는 환경 변수 DB_PASSWORD로 받는다. (로컬 MySQL root에 비밀번호가 없으면 비워 둔다)
+    password: ${DB_PASSWORD:}
+  jpa:
+    # 테이블은 SQL로 직접 만들었으므로 Hibernate는 엔티티와 테이블이 맞는지 검사만 한다.
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+server:
+  error:
+    # 기본값(never)이면 404·400 응답에 이유가 빠진다. 우리가 직접 쓴 문구만 나가므로 켜 둔다.
+    # (예외를 한곳에서 다루는 @RestControllerAdvice는 6주차에 배운다)
+    include-message: always
+
+app:
+  cors:
+    # 프론트 개발 서버 주소. (mock-frontend, MovieLog Flutter 웹 모두 5173으로 띄운다)
+    # 여러 개면 쉼표로 잇는다. "*"로 바꾸면 모든 출처를 허용한다. (docs의 비교 참고)
+    allowed-origins: http://localhost:5173

@@ -1,0 +1,2 @@
+"Access to fetch at 'http://localhost:8080/members/nickname/%EC%88%98%ED%98%84' from origin 'http://localhost:5173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.", source: http://localhost:5173/#auto (0)
+"TypeError: Failed to fetch", source: http://localhost:5173/ (42)

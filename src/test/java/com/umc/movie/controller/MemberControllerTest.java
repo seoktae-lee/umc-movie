@@ -2,6 +2,10 @@ package com.umc.movie.controller;
 
 import com.umc.movie.config.WebConfig;
 import com.umc.movie.dto.EmailCheckResponse;
+import com.umc.movie.dto.MemberResponse;
+import com.umc.movie.dto.SignUpRequest;
+import com.umc.movie.exception.ErrorCode;
+import com.umc.movie.exception.GeneralException;
 import com.umc.movie.dto.NicknameCheckResponse;
 import com.umc.movie.service.MemberService;
 import org.junit.jupiter.api.DisplayName;
@@ -9,15 +13,18 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(MemberController.class)
@@ -99,5 +106,64 @@ class MemberControllerTest {
                         .header("Access-Control-Request-Method", "PATCH"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE"));
+    }
+
+    private static final String VALID_BODY = """
+            {"email": "umc@example.com", "password": "Umc!1234", "nickname": "moviefan"}
+            """;
+
+    @Test
+    @DisplayName("회원가입 성공: 201 + 공통 응답, password는 응답에 없다")
+    void signUpCreated() throws Exception {
+        given(memberService.signUp(any(SignUpRequest.class)))
+                .willReturn(new MemberResponse(3L, "umc@example.com", "moviefan"));
+
+        mockMvc.perform(post("/members").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.code").value("COMMON201"))
+                .andExpect(jsonPath("$.message").value("회원가입에 성공했습니다."))
+                .andExpect(jsonPath("$.result.memberId").value(3))
+                .andExpect(jsonPath("$.result.password").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("회원가입 검증 실패: 400 COMMON4001 + DTO에 적은 문구, 서비스는 호출되지 않는다")
+    void signUpInvalid() throws Exception {
+        mockMvc.perform(post("/members").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "umc@example.com", "password": "password", "nickname": "moviefan"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value("COMMON4001"))
+                .andExpect(jsonPath("$.message").value("비밀번호는 대문자/소문자/숫자/특수문자를 포함한 8자 이상이어야 합니다."))
+                .andExpect(jsonPath("$.result").isEmpty());
+
+        verify(memberService, never()).signUp(any());
+    }
+
+    @Test
+    @DisplayName("회원가입 중복: 이메일은 MEMBER4091, 닉네임은 MEMBER4092")
+    void signUpDuplicated() throws Exception {
+        given(memberService.signUp(any(SignUpRequest.class)))
+                .willThrow(new GeneralException(ErrorCode.MEMBER_EMAIL_DUPLICATED))
+                .willThrow(new GeneralException(ErrorCode.MEMBER_NICKNAME_DUPLICATED));
+
+        mockMvc.perform(post("/members").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MEMBER4091"))
+                .andExpect(jsonPath("$.message").value("이미 사용 중인 이메일입니다."));
+        mockMvc.perform(post("/members").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MEMBER4092"));
+    }
+
+    @Test
+    @DisplayName("JSON이 깨져 있으면 400 COMMON4002")
+    void brokenJson() throws Exception {
+        mockMvc.perform(post("/members").contentType(MediaType.APPLICATION_JSON).content("{\"email\":"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON4002"));
     }
 }

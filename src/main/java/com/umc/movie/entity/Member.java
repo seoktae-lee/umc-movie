@@ -2,6 +2,7 @@ package com.umc.movie.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -20,13 +21,15 @@ public class Member extends BaseTimeEntity {
     @Column(nullable = false, unique = true, length = 254)
     private String email;
 
-    // 6주차부터 bcrypt 해시(항상 60자)가 저장된다. 지금은 더미 문자열.
+    // 평문이 아니라 bcrypt 해시(항상 60자)를 저장한다. (시드 데이터 2명은 더미 문자열)
     @Column(nullable = false, length = 60)
     private String password;
 
     @Column(nullable = false, unique = true, length = 50)
     private String nickname;
 
+    // Member.builder().email(..).password(..).nickname(..).build() 로 만든다.
+    @Builder
     public Member(String email, String password, String nickname) {
         this.email = email;
         this.password = password;

@@ -83,11 +83,11 @@ if (exception instanceof ErrorResponse errorResponse) {
 
 👉 서비스 안에서 `memberRepository.flush()`로 UPDATE를 먼저 내보내고, `DataIntegrityViolationException`을 `MEMBER409_1`로 바꿨다. 다시 재현한 결과는 200 10개, 409 `MEMBER409_1` 10개다. 재현 스크립트: `scripts/concurrent_nickname.py`
 
-## No.5 유효시간을 1초로 줄였는데 토큰이 바로 만료되지 않음
+## No.5 유효시간을 60초로 줄였는데 1분 뒤에도 토큰이 통과함
 
 **`이슈`**
 
-👉 `AUTH401_4`를 보려고 `JWT_ACCESS_EXPIRATION=1`로 서버를 띄웠다. 토큰 payload의 `exp`는 `iat`보다 1초 뒤인데, 발급 3초 후와 30초 후 요청 모두 200이었다.
+👉 선택 미션대로 `JWT_ACCESS_EXPIRATION=60`으로 서버를 재시작했다. 워크북은 1분을 기다리면 `AUTH401_4`가 나온다고 했지만, 토큰 payload의 `exp`가 `iat`보다 60초 뒤인데도 발급 65초 후 요청이 200이었다.
 
 **`문제`**
 
@@ -95,7 +95,7 @@ if (exception instanceof ErrorResponse errorResponse) {
 
 **`해결`**
 
-👉 발급 65초 후에 같은 토큰을 보내 401 `AUTH401_4`를 확인했다. 실제 토큰의 최대 사용 가능 시간은 유효시간 + 60초라는 점도 함께 알게 됐다.
+👉 발급 125초 후에 같은 토큰을 보내 401 `AUTH401_4`를 확인했다. 실제 토큰의 최대 사용 가능 시간은 유효시간 + 60초라는 점도 함께 알게 됐다.
 
 **`참고레퍼런스`**
 

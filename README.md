@@ -56,6 +56,8 @@ src/main/java/com/umc/movie
 ├── controller   AuthController, MemberController, RatingController, GlobalExceptionHandler
 ├── interceptor  AuthInterceptor (토큰 검사)
 ├── util         JwtUtil (토큰 발급·검증)
+├── annotation   LoginMember
+├── resolver     LoginMemberArgumentResolver
 ├── exception    ApiException, ErrorCode, GeneralException
 ├── service      AuthService, MemberService, RatingService
 ├── repository   MemberRepository, RatingRepository

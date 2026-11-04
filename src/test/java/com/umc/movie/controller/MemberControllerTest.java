@@ -7,35 +7,54 @@ import com.umc.movie.dto.SignUpRequest;
 import com.umc.movie.exception.ErrorCode;
 import com.umc.movie.exception.GeneralException;
 import com.umc.movie.dto.NicknameCheckResponse;
+import com.umc.movie.dto.MemberInfoResponse;
+import com.umc.movie.dto.MemberUpdateRequest;
+import com.umc.movie.exception.ApiException;
+import com.umc.movie.interceptor.AuthInterceptor;
 import com.umc.movie.service.MemberService;
+import com.umc.movie.util.JwtUtil;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.LocalDateTime;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(MemberController.class)
-@Import(WebConfig.class)
+@Import({WebConfig.class, AuthInterceptor.class, JwtUtil.class})
 class MemberControllerTest {
 
     @Autowired
     MockMvc mockMvc;
 
+    @Autowired
+    JwtUtil jwtUtil;
+
     @MockitoBean
     MemberService memberService;
+
+    private String bearer(Long memberId) {
+        return "Bearer " + jwtUtil.createAccessToken(memberId, memberId + "@umc.com");
+    }
 
     @Test
     @DisplayName("이미 있는 닉네임이면 available=false")
@@ -105,7 +124,7 @@ class MemberControllerTest {
                         .header("Origin", "http://localhost:5173")
                         .header("Access-Control-Request-Method", "PATCH"))
                 .andExpect(status().isOk())
-                .andExpect(header().string("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE"));
+                .andExpect(header().string("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS"));
     }
 
     private static final String VALID_BODY = """
@@ -165,5 +184,69 @@ class MemberControllerTest {
         mockMvc.perform(post("/members").contentType(MediaType.APPLICATION_JSON).content("{\"email\":"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMON4002"));
+    }
+
+    @Test
+    @DisplayName("내 정보 조회: 토큰의 memberId로 조회하고 password는 응답에 없다")
+    void myInfo() throws Exception {
+        given(memberService.getMyInfo(5L)).willReturn(new MemberInfoResponse("movie@umc.com", "영화광", LocalDateTime.of(2026, 9, 2, 21, 14, 3)));
+
+        mockMvc.perform(get("/members/me").header(AUTHORIZATION, bearer(5L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.email").value("movie@umc.com"))
+                .andExpect(jsonPath("$.result.createdAt").value("2026-09-02T21:14:03"))
+                .andExpect(jsonPath("$.result.password").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("헤더가 없거나 Bearer 형식이 아니면 401 AUTH401_2")
+    void myInfoNoToken() throws Exception {
+        mockMvc.perform(get("/members/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_2"));
+        mockMvc.perform(get("/members/me").header(AUTHORIZATION, bearer(5L).replace("Bearer ", "Basic ")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_2"));
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    @DisplayName("payload 한 글자를 바꾼 토큰은 401 AUTH401_3")
+    void myInfoForged() throws Exception {
+        String[] parts = bearer(5L).split("\\.");
+        char c = parts[1].charAt(5);
+        parts[1] = parts[1].substring(0, 5) + (c == 'A' ? 'B' : 'A') + parts[1].substring(6);
+
+        mockMvc.perform(get("/members/me").header(AUTHORIZATION, String.join(".", parts)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH401_3"));
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    @DisplayName("내 정보 수정: 닉네임 규칙 위반은 400, 다른 회원의 닉네임이면 409 MEMBER409_1")
+    void updateMyInfo() throws Exception {
+        mockMvc.perform(patch("/members/me").header(AUTHORIZATION, bearer(5L)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\": \"가\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("닉네임은 2자 이상 12자 이하여야 합니다."));
+
+        given(memberService.updateMyInfo(eq(5L), any(MemberUpdateRequest.class)))
+                .willThrow(new ApiException(HttpStatus.CONFLICT, "MEMBER409_1", "이미 사용 중인 닉네임입니다."));
+        mockMvc.perform(patch("/members/me").header(AUTHORIZATION, bearer(5L)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\": \"수현\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MEMBER409_1"));
+    }
+
+    @Test
+    @DisplayName("토큰이 필요한 경로의 preflight는 토큰 없이 통과하고 Authorization 헤더를 허용한다")
+    void preflightOnProtectedPath() throws Exception {
+        mockMvc.perform(options("/members/me")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "PATCH")
+                        .header("Access-Control-Request-Headers", "authorization,content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
     }
 }

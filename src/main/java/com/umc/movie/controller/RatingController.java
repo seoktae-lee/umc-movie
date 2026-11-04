@@ -4,6 +4,7 @@ import com.umc.movie.dto.ApiResponse;
 import com.umc.movie.dto.CreateRatingRequest;
 import com.umc.movie.dto.RatingResponse;
 import com.umc.movie.dto.UpdateRatingRequest;
+import com.umc.movie.interceptor.AuthInterceptor;
 import com.umc.movie.service.RatingService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -16,23 +17,20 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * 파일은 자원(Rating) 기준으로 나누고, URL은 프론트가 이해하기 쉬운 /members/... 모양으로 맞춘다.
- *
- * 로그인(7주차) 전이라 "누구의 요청인지"를 경로의 memberId로 받는다.
- * 7주차에는 이 값을 토큰에서 꺼낸다.
+ * 등록·수정·삭제는 "누구의 요청인지"를 요청에서 받지 않고 토큰에서 알아낸다. (7주차)
+ * 값을 받지 않는 것이 곧 그 값을 조작당하지 않는 방법이다.
  */
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/members")
 public class RatingController {
 
     private final RatingService ratingService;
 
     /**
-     * 유저별 평점 조회. 최신순.
+     * 유저별 평점 조회. 최신순. 누구나 볼 수 있는 공개 목록이라 토큰 없이 호출한다.
      * (선택 미션) ?page=0&size=10으로 잘라 받을 수 있다. 생략하면 첫 페이지 20개.
      */
-    @GetMapping("/{memberId}/ratings")
+    @GetMapping("/members/{memberId}/ratings")
     public List<RatingResponse> getMemberRatings(
             @PathVariable Long memberId,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page는 0 이상이어야 합니다.") int page,
@@ -41,30 +39,32 @@ public class RatingController {
         return ratingService.getRatingsByMember(memberId, page, size);
     }
 
-    /** 평점 등록. 201 + 새 ratingId. */
-    @PostMapping("/{memberId}/ratings")
-    public ResponseEntity<ApiResponse<Long>> create(
-            @PathVariable Long memberId,
+    /** 평점 등록. 201 + 등록된 평점. */
+    @PostMapping("/ratings")
+    public ResponseEntity<ApiResponse<RatingResponse>> create(
+            @RequestAttribute(AuthInterceptor.MEMBER_ID) Long memberId,
             @Valid @RequestBody CreateRatingRequest request) {
-        Long ratingId = ratingService.create(memberId, request);
+        RatingResponse response = ratingService.create(memberId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.created("평점 등록에 성공했습니다.", ratingId));
+                .body(ApiResponse.created("평점 등록에 성공했습니다.", response));
     }
 
-    /** 평점 수정. 200. 본인 평점이 아니면 403, 없으면 404. */
-    @PatchMapping("/{memberId}/ratings/{ratingId}")
-    public ResponseEntity<ApiResponse<Void>> update(
-            @PathVariable Long memberId,
+    /** 평점 수정. 200 + 수정된 평점. 본인 평점이 아니면 403, 없으면 404. */
+    @PatchMapping("/ratings/{ratingId}")
+    public ResponseEntity<ApiResponse<RatingResponse>> update(
+            @RequestAttribute(AuthInterceptor.MEMBER_ID) Long memberId,
             @PathVariable Long ratingId,
             @Valid @RequestBody UpdateRatingRequest request) {
-        ratingService.update(ratingId, memberId, request);
-        return ResponseEntity.ok(ApiResponse.ok("평점 수정에 성공했습니다.", null));
+        RatingResponse response = ratingService.update(ratingId, memberId, request);
+        return ResponseEntity.ok(ApiResponse.ok("평점 수정에 성공했습니다.", response));
     }
 
-    /** 평점 삭제. 204 No Content는 본문이 없으므로 ApiResponse도 보내지 않는다. */
-    @DeleteMapping("/{memberId}/ratings/{ratingId}")
-    public ResponseEntity<Void> delete(@PathVariable Long memberId, @PathVariable Long ratingId) {
+    /** 평점 삭제. 204는 본문을 보낼 수 없어 공통 형식을 지키려고 200 + result null로 응답한다. */
+    @DeleteMapping("/ratings/{ratingId}")
+    public ResponseEntity<ApiResponse<Void>> delete(
+            @RequestAttribute(AuthInterceptor.MEMBER_ID) Long memberId,
+            @PathVariable Long ratingId) {
         ratingService.delete(ratingId, memberId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.ok("평점 삭제에 성공했습니다.", null));
     }
 }

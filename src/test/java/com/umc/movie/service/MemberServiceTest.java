@@ -1,6 +1,7 @@
 package com.umc.movie.service;
 
 import com.umc.movie.dto.MemberResponse;
+import com.umc.movie.dto.MemberUpdateRequest;
 import com.umc.movie.dto.SignUpRequest;
 import com.umc.movie.entity.Member;
 import com.umc.movie.exception.ErrorCode;
@@ -13,8 +14,11 @@ import org.mockito.Mock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -22,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 
 @ExtendWith(MockitoExtension.class)
 class MemberServiceTest {
@@ -77,5 +82,51 @@ class MemberServiceTest {
                 .extracting("errorCode").isEqualTo(ErrorCode.MEMBER_NICKNAME_DUPLICATED);
 
         verify(memberRepository, never()).save(any());
+    }
+
+    private static Member member() {
+        return Member.builder().email("a@umc.com").password("hash").nickname("영화광").build();
+    }
+
+    @Test
+    @DisplayName("내 정보 조회·수정: 토큰의 회원이 DB에 없으면 404 MEMBER404_1")
+    void memberNotFound() {
+        given(memberRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> memberService.getMyInfo(999L)).extracting("code").isEqualTo("MEMBER404_1");
+        assertThatThrownBy(() -> memberService.updateMyInfo(999L, new MemberUpdateRequest("새닉네임")))
+                .extracting("code").isEqualTo("MEMBER404_1");
+    }
+
+    @Test
+    @DisplayName("내 정보 수정: 다른 회원이 쓰는 닉네임이면 409, 값을 바꾸지 않는다")
+    void updateDuplicated() {
+        Member member = member();
+        given(memberRepository.findById(5L)).willReturn(Optional.of(member));
+        given(memberRepository.existsByNicknameAndMemberIdNot("수현", 5L)).willReturn(true);
+
+        assertThatThrownBy(() -> memberService.updateMyInfo(5L, new MemberUpdateRequest("수현")))
+                .extracting("code").isEqualTo("MEMBER409_1");
+        assertThat(member.getNickname()).isEqualTo("영화광");
+    }
+
+    @Test
+    @DisplayName("내 정보 수정: 내 닉네임을 그대로 보내면 중복이 아니다")
+    void updateSameNickname() {
+        given(memberRepository.findById(5L)).willReturn(Optional.of(member()));
+        given(memberRepository.existsByNicknameAndMemberIdNot("영화광", 5L)).willReturn(false);
+
+        assertThat(memberService.updateMyInfo(5L, new MemberUpdateRequest("영화광")).nickname()).isEqualTo("영화광");
+    }
+
+    @Test
+    @DisplayName("내 정보 수정: 사전 검사를 통과해도 DB UNIQUE에 막히면 같은 409 MEMBER409_1")
+    void updateRace() {
+        given(memberRepository.findById(5L)).willReturn(Optional.of(member()));
+        given(memberRepository.existsByNicknameAndMemberIdNot("경쟁", 5L)).willReturn(false);
+        willThrow(new DataIntegrityViolationException("Duplicate entry")).given(memberRepository).flush();
+
+        assertThatThrownBy(() -> memberService.updateMyInfo(5L, new MemberUpdateRequest("경쟁")))
+                .extracting("code").isEqualTo("MEMBER409_1");
     }
 }

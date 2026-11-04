@@ -4,8 +4,7 @@ import com.umc.movie.dto.CreateRatingRequest;
 import com.umc.movie.dto.UpdateRatingRequest;
 import com.umc.movie.entity.Member;
 import com.umc.movie.entity.Rating;
-import com.umc.movie.exception.ErrorCode;
-import com.umc.movie.exception.GeneralException;
+import com.umc.movie.exception.ApiException;
 import com.umc.movie.repository.MemberRepository;
 import com.umc.movie.repository.RatingRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -45,8 +44,8 @@ class RatingServiceTest {
         given(memberRepository.existsById(999L)).willReturn(false);
 
         assertThatThrownBy(() -> ratingService.getRatingsByMember(999L, 0, 20))
-                .isInstanceOf(GeneralException.class)
-                .extracting("errorCode").isEqualTo(ErrorCode.MEMBER_NOT_FOUND);
+                .isInstanceOf(ApiException.class)
+                .extracting("code").isEqualTo("MEMBER404_1");
         verify(ratingRepository, never()).findByMember_MemberIdOrderByRatingIdDesc(any(), any());
     }
 
@@ -78,7 +77,7 @@ class RatingServiceTest {
         given(memberRepository.findById(999L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> ratingService.create(999L, new CreateRatingRequest(550L, 5, null)))
-                .extracting("errorCode").isEqualTo(ErrorCode.MEMBER_NOT_FOUND);
+                .extracting("code").isEqualTo("MEMBER404_1");
     }
 
     @Test
@@ -88,7 +87,7 @@ class RatingServiceTest {
         given(ratingRepository.existsByMember_MemberIdAndMovieId(1L, 550L)).willReturn(true);
 
         assertThatThrownBy(() -> ratingService.create(1L, new CreateRatingRequest(550L, 5, null)))
-                .extracting("errorCode").isEqualTo(ErrorCode.RATING_DUPLICATED);
+                .extracting("code").isEqualTo("RATING409_1");
         verify(ratingRepository, never()).save(any());
     }
 
@@ -111,9 +110,9 @@ class RatingServiceTest {
         given(ratingRepository.findById(10L)).willReturn(Optional.of(rating));
 
         assertThatThrownBy(() -> ratingService.update(10L, 2L, new UpdateRatingRequest(1, "남의 것")))
-                .extracting("errorCode").isEqualTo(ErrorCode.RATING_FORBIDDEN);
+                .extracting("code").isEqualTo("RATING403_1");
         assertThatThrownBy(() -> ratingService.delete(10L, 2L))
-                .extracting("errorCode").isEqualTo(ErrorCode.RATING_FORBIDDEN);
+                .extracting("code").isEqualTo("RATING403_1");
         assertThat(rating.getScore()).isEqualTo(3);
         verify(ratingRepository, never()).delete(any());
     }
@@ -124,6 +123,6 @@ class RatingServiceTest {
         given(ratingRepository.findById(999L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> ratingService.delete(999L, 1L))
-                .extracting("errorCode").isEqualTo(ErrorCode.RATING_NOT_FOUND);
+                .extracting("code").isEqualTo("RATING404_1");
     }
 }

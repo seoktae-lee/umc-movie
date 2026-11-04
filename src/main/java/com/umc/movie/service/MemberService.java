@@ -1,14 +1,19 @@
 package com.umc.movie.service;
 
 import com.umc.movie.dto.EmailCheckResponse;
+import com.umc.movie.dto.MemberInfoResponse;
 import com.umc.movie.dto.MemberResponse;
+import com.umc.movie.dto.MemberUpdateRequest;
 import com.umc.movie.dto.NicknameCheckResponse;
 import com.umc.movie.dto.SignUpRequest;
 import com.umc.movie.entity.Member;
+import com.umc.movie.exception.ApiException;
 import com.umc.movie.exception.ErrorCode;
 import com.umc.movie.exception.GeneralException;
 import com.umc.movie.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -61,5 +66,37 @@ public class MemberService {
         // IDENTITY 전략이라 save() 순간 INSERT가 나간다. UNIQUE 위반도 여기서 바로 터진다.
         Member savedMember = memberRepository.save(member);
         return MemberResponse.from(savedMember);
+    }
+
+    @Transactional(readOnly = true)
+    public MemberInfoResponse getMyInfo(Long memberId) {
+        return MemberInfoResponse.from(findMember(memberId));
+    }
+
+    @Transactional
+    public MemberInfoResponse updateMyInfo(Long memberId, MemberUpdateRequest request) {
+        Member member = findMember(memberId);
+
+        // 나를 제외한 다른 회원이 그 닉네임을 쓰고 있다면 막는다. (내 닉네임 그대로 보내는 것은 통과)
+        // DB에도 UNIQUE 제약이 걸려 있지만, 제약 위반 예외 대신 우리가 정한 응답을 주려고 먼저 확인한다.
+        if (memberRepository.existsByNicknameAndMemberIdNot(request.nickname(), memberId)) {
+            throw new ApiException(HttpStatus.CONFLICT, "MEMBER409_1", "이미 사용 중인 닉네임입니다.");
+        }
+
+        member.updateNickname(request.nickname());
+        try {
+            // 위 검사를 동시에 통과한 요청은 DB UNIQUE가 막는다. 커밋까지 미루면 회원가입용 code로 나가므로
+            // 여기서 UPDATE를 내보내 사전 검사와 같은 code로 바꾼다.
+            memberRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new ApiException(HttpStatus.CONFLICT, "MEMBER409_1", "이미 사용 중인 닉네임입니다.");
+        }
+        return MemberInfoResponse.from(member);
+    }
+
+    private Member findMember(Long memberId) {
+        return memberRepository.findById(memberId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "MEMBER404_1",
+                        "해당 회원을 찾을 수 없습니다."));
     }
 }

@@ -1,4 +1,7 @@
 spring:
+  config:
+    # 프로젝트 루트의 .env(깃에 올리지 않는다)를 설정으로 읽는다. 없어도 실행 환경 변수를 쓰면 된다.
+    import: optional:file:.env[.properties]
   datasource:
     url: jdbc:mysql://localhost:3306/umc_movie
     username: root
@@ -21,3 +24,7 @@ app:
     # 프론트 개발 서버 주소. (mock-frontend, MovieLog Flutter 웹 모두 5173으로 띄운다)
     # 여러 개면 쉼표로 잇는다. "*"로 바꾸면 모든 출처를 허용한다. (docs의 비교 참고)
     allowed-origins: http://localhost:5173
+
+jwt:
+  secret: ${JWT_SECRET} # 서명에 쓸 비밀키. 코드에 직접 쓰지 않는다. (32자 이상)
+  access-expiration: ${JWT_ACCESS_EXPIRATION} # 토큰 유효시간(초)

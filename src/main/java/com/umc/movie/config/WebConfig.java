@@ -1,11 +1,15 @@
 package com.umc.movie.config;
 
 import com.umc.movie.interceptor.AuthInterceptor;
+import com.umc.movie.resolver.LoginMemberArgumentResolver;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import java.util.List;
 
 /**
  * 서비스 전체에 같은 CORS 정책과 토큰 관문을 한곳에서 적용한다.
@@ -32,6 +36,12 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowedOrigins(allowedOrigins) // 이 출처에서 오는 요청만 허용
                 .allowedMethods("GET", "POST", "PATCH", "DELETE", "OPTIONS")
                 .allowedHeaders("*"); // Authorization 헤더도 여기에 포함된다
+    }
+
+    /** 컨트롤러 파라미터의 @LoginMember를 처리한다. */
+    @Override
+    public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
+        resolvers.add(new LoginMemberArgumentResolver());
     }
 
     /**

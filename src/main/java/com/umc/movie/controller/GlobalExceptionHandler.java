@@ -1,6 +1,7 @@
 package com.umc.movie.controller;
 
 import com.umc.movie.dto.ApiResponse;
+import com.umc.movie.exception.ApiException;
 import com.umc.movie.exception.ErrorCode;
 import com.umc.movie.exception.GeneralException;
 import lombok.extern.slf4j.Slf4j;
@@ -8,6 +9,7 @@ import org.springframework.context.MessageSourceResolvable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -29,6 +31,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(GeneralException.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneral(GeneralException exception) {
         return toResponse(exception.getErrorCode(), exception.getMessage());
+    }
+
+    /** 관문·서비스에서 직접 던진 예외. 예외가 들고 온 상태 코드와 code를 그대로 쓴다. (7주차) */
+    @ExceptionHandler(ApiException.class)
+    public ResponseEntity<ApiResponse<Void>> handleApiException(ApiException exception) {
+        return ResponseEntity.status(exception.getStatus())
+                .body(ApiResponse.failure(exception.getCode(), exception.getMessage()));
     }
 
     /** @Valid @RequestBody DTO 검증 실패. 첫 번째 필드 오류 문구를 그대로 보여 준다. */
@@ -83,9 +92,18 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.failure("COMMON" + status, exception.getReason()));
     }
 
-    /** 예상하지 못한 오류. 내부 메시지·스택은 로그에만 남기고 응답에는 노출하지 않는다. */
+    /**
+     * 예상하지 못한 오류. 내부 메시지·스택은 로그에만 남기고 응답에는 노출하지 않는다.
+     * 단, 없는 경로(404)·허용하지 않는 메서드(405)처럼 스프링이 상태 코드를 이미 아는 예외는
+     * 500으로 덮지 않고 그 코드를 그대로 쓴다.
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpected(Exception exception) {
+        if (exception instanceof ErrorResponse errorResponse) {
+            int status = errorResponse.getStatusCode().value();
+            return ResponseEntity.status(status)
+                    .body(ApiResponse.failure("COMMON" + status, errorResponse.getBody().getDetail()));
+        }
         log.error("처리하지 못한 예외", exception);
         return toResponse(ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.getMessage());
     }

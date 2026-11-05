@@ -5,12 +5,12 @@ import com.umc.movie.dto.RatingResponse;
 import com.umc.movie.dto.UpdateRatingRequest;
 import com.umc.movie.entity.Member;
 import com.umc.movie.entity.Rating;
-import com.umc.movie.exception.ErrorCode;
-import com.umc.movie.exception.GeneralException;
+import com.umc.movie.exception.ApiException;
 import com.umc.movie.repository.MemberRepository;
 import com.umc.movie.repository.RatingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,7 +27,7 @@ public class RatingService {
     public List<RatingResponse> getRatingsByMember(Long memberId, int page, int size) {
         // 평점이 0개인 유저(빈 배열)와 없는 유저(404)를 구분한다.
         if (!memberRepository.existsById(memberId)) {
-            throw new GeneralException(ErrorCode.MEMBER_NOT_FOUND);
+            throw new ApiException(HttpStatus.NOT_FOUND, "MEMBER404_1", "해당 회원을 찾을 수 없습니다.");
         }
 
         return ratingRepository.findByMember_MemberIdOrderByRatingIdDesc(memberId, PageRequest.of(page, size))
@@ -38,14 +38,15 @@ public class RatingService {
 
     /** 평점 등록. 없는 회원이면 404, 같은 영화에 이미 남겼으면 409. */
     @Transactional
-    public Long create(Long memberId, CreateRatingRequest request) {
+    public RatingResponse create(Long memberId, CreateRatingRequest request) {
         Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new GeneralException(ErrorCode.MEMBER_NOT_FOUND));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "MEMBER404_1",
+                        "해당 회원을 찾을 수 없습니다."));
 
         // rating 테이블에는 (member_id, movie_id) 복합 UNIQUE가 걸려 있어 DB도 막아 준다.
         // 우리가 정한 문구로 응답하려고 먼저 확인한다.
         if (ratingRepository.existsByMember_MemberIdAndMovieId(memberId, request.movieId())) {
-            throw new GeneralException(ErrorCode.RATING_DUPLICATED);
+            throw new ApiException(HttpStatus.CONFLICT, "RATING409_1", "이미 이 영화에 평점을 남기셨습니다.");
         }
 
         Rating rating = Rating.builder()
@@ -55,14 +56,17 @@ public class RatingService {
                 .comment(request.comment())
                 .build();
 
-        return ratingRepository.save(rating).getRatingId();
+        return RatingResponse.from(ratingRepository.save(rating));
     }
 
     /** 평점 수정. 값만 바꾸면 트랜잭션이 끝날 때 JPA가 UPDATE를 보낸다. (dirty checking) */
     @Transactional
-    public void update(Long ratingId, Long memberId, UpdateRatingRequest request) {
+    public RatingResponse update(Long ratingId, Long memberId, UpdateRatingRequest request) {
         Rating rating = findOwnedRating(ratingId, memberId);
         rating.update(request.score(), request.comment());
+        // 트랜잭션이 끝날 때까지 기다리면 UPDATE 전의 updatedAt이 응답에 실린다. 먼저 내보내고 응답을 만든다.
+        ratingRepository.flush();
+        return RatingResponse.from(rating);
     }
 
     @Transactional
@@ -77,11 +81,13 @@ public class RatingService {
      */
     private Rating findOwnedRating(Long ratingId, Long memberId) {
         Rating rating = ratingRepository.findById(ratingId)
-                .orElseThrow(() -> new GeneralException(ErrorCode.RATING_NOT_FOUND));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RATING404_1",
+                        "해당 평점을 찾을 수 없습니다."));
 
         // member는 LAZY지만 getMemberId()는 프록시가 이미 가진 id라 추가 SELECT가 나가지 않는다.
         if (!rating.getMember().getMemberId().equals(memberId)) {
-            throw new GeneralException(ErrorCode.RATING_FORBIDDEN);
+            throw new ApiException(HttpStatus.FORBIDDEN, "RATING403_1",
+                    "본인이 작성한 평점만 수정하거나 삭제할 수 있습니다.");
         }
         return rating;
     }

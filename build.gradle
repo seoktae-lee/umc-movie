@@ -23,6 +23,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     // bcrypt 해시만 쓴다. starter-security를 넣으면 모든 API가 로그인 페이지로 막힌다.
     implementation 'org.springframework.security:spring-security-crypto'
+    // JWT 생성/검증 라이브러리
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
     annotationProcessor 'org.projectlombok:lombok'
@@ -35,4 +39,7 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // 테스트 전용 값. 실제 실행 값은 커밋하지 않는 .env에 둔다.
+    environment 'JWT_SECRET', 'test-only-secret-key-for-unit-tests-32-characters'
+    environment 'JWT_ACCESS_EXPIRATION', '3600'
 }

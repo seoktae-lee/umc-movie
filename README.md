@@ -68,3 +68,15 @@ src/main/java/com/umc/movie
 문서: [docs/week5-report.md](docs/week5-report.md) · [docs/week5-troubleshooting.md](docs/week5-troubleshooting.md) · Postman: [postman/umc-week5.postman_collection.json](postman/umc-week5.postman_collection.json)
 
 7주차 문서: [docs/week7-notion.md](docs/week7-notion.md) · [docs/week7-troubleshooting.md](docs/week7-troubleshooting.md) · Postman: [postman/umc-week7.postman_collection.json](postman/umc-week7.postman_collection.json)
+
+## API (8주차: 즐겨찾기와 영화 기록)
+
+모두 `Authorization: Bearer {토큰}` 필요. memberId는 받지 않는다.
+
+| API | Method | URL | 성공 | 대표 실패 |
+| --- | --- | --- | --- | --- |
+| 즐겨찾기 등록 | POST | `/favorites` | 201 `{favoriteId, movieId, createdAt}` | 409 `FAVORITE409_1` |
+| 내 즐겨찾기 조회 | GET | `/favorites` | 200 배열(최신 등록순) | 401 `AUTH401_2` |
+| 즐겨찾기 여부 | GET | `/favorites/{movieId}` | 200 `{isFavorite}` | 401 `AUTH401_2` |
+| 즐겨찾기 해제 | DELETE | `/favorites/{movieId}` | 200 result null | 404 `FAVORITE404_1` |
+| 영화 기록 저장 | POST | `/movie-records` | 201 `{rating, favorite}` (한 트랜잭션) | 409 `RATING409_1`·`FAVORITE409_1` |

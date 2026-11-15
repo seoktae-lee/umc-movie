@@ -67,7 +67,7 @@
 | --- | --- |
 | 이름 / 닉네임 | 이석태 / 태이 |
 | GitHub 저장소 | https://github.com/seoktae-lee/umc-movie |
-| Pull Request | (미제출) |
+| Pull Request | https://github.com/seoktae-lee/umc-movie/pull/2 |
 | 브랜치 | feature/week-8 |
 | 스택 | Spring Boot 3.5 · Java 21 · MySQL |
 | 검증 | 테스트 72개 통과 / 실제 서버에 16개 요청을 보내 모두 기대한 상태 코드와 code 확인 |

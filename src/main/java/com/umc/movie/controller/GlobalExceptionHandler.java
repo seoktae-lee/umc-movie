@@ -113,6 +113,7 @@ public class GlobalExceptionHandler {
         if (cause.contains("member.email")) return ErrorCode.MEMBER_EMAIL_DUPLICATED;
         if (cause.contains("member.nickname")) return ErrorCode.MEMBER_NICKNAME_DUPLICATED;
         if (cause.contains("uk_rating_member_movie")) return ErrorCode.RATING_DUPLICATED;
+        if (cause.contains("uk_favorite_member_movie")) return ErrorCode.FAVORITE_DUPLICATED;
         return ErrorCode.DATA_CONFLICT;
     }
 

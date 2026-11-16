@@ -3,7 +3,7 @@ set -euo pipefail
 
 exec > >(tee -a /var/log/umc-movie-bootstrap.log) 2>&1
 
-dnf install -y docker awscli
+dnf install -y docker
 systemctl enable --now docker
 
 IMDS_TOKEN=$(curl -fsS -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600' http://169.254.169.254/latest/api/token)

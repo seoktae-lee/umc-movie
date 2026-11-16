@@ -31,7 +31,7 @@ aws rds describe-db-subnet-groups --db-subnet-group-name "$NAME" >/dev/null 2>&1
   aws rds create-db-subnet-group --db-subnet-group-name "$NAME" --db-subnet-group-description 'UMC movie week1' --subnet-ids "${SUBNET_IDS[@]}" >/dev/null
 
 if ! aws ssm get-parameter --name /umc-movie/week1/db-password >/dev/null 2>&1; then
-  DB_PASSWORD=$(openssl rand -hex 24)
+  DB_PASSWORD=$(openssl rand -hex 16)
   aws ssm put-parameter --name /umc-movie/week1/db-password --type SecureString --value "$DB_PASSWORD" >/dev/null
 fi
 if ! aws ssm get-parameter --name /umc-movie/week1/jwt-secret >/dev/null 2>&1; then

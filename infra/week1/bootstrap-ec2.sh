@@ -22,7 +22,7 @@ done
 
 curl -fsSL https://raw.githubusercontent.com/seoktae-lee/umc-movie/infra/week1-prep/docs/sql/01_schema.sql -o /tmp/umc-schema.sql
 MYSQL_PWD="$DB_PASSWORD" docker run --rm -e MYSQL_PWD -v /tmp/umc-schema.sql:/schema.sql:ro mysql:8.4 \
-  sh -c 'mysql -h "$1" -u admin < /schema.sql' sh "$DB_HOST"
+  sh -c 'if ! mysql -h "$1" -u admin -Nse "SELECT member_id FROM umc_movie.member LIMIT 0" >/dev/null 2>&1; then mysql -h "$1" -u admin < /schema.sql; fi' sh "$DB_HOST"
 
 aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
 docker pull "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/umc-movie-week1:latest"

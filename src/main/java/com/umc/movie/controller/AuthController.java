@@ -1,9 +1,15 @@
 package com.umc.movie.controller;
 
+import com.umc.movie.config.ApiExamples;
 import com.umc.movie.dto.ApiResponse;
 import com.umc.movie.dto.LoginRequest;
 import com.umc.movie.dto.LoginResponse;
 import com.umc.movie.service.AuthService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -15,10 +21,34 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
+@Tag(name = "인증", description = "로그인과 토큰 발급 API. 토큰 없이 호출하는 공개 API입니다.")
 public class AuthController {
 
     private final AuthService authService;
 
+    @Operation(
+            summary = "이메일 로그인",
+            description = """
+                    이메일과 비밀번호로 로그인하고 Access Token을 발급받습니다.
+                    발급받은 토큰은 위쪽 Authorize 버튼에 넣어 두면 인증이 필요한 API에 자동으로 실립니다.
+                    """
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "로그인 성공. result.accessToken을 Authorize에 넣으세요.",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
+                            {
+                              "isSuccess": true,
+                              "code": "COMMON200",
+                              "message": "로그인에 성공했습니다.",
+                              "result": { "nickname": "영화조아", "accessToken": "eyJhbGciOiJIUzI1NiJ9..." }
+                            }
+                            """))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401", description = "이메일 또는 비밀번호가 틀림 (어느 쪽이 틀렸는지는 알려 주지 않습니다)",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = ApiExamples.LOGIN_FAILED)))
+    })
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(
             @RequestBody @Valid LoginRequest request

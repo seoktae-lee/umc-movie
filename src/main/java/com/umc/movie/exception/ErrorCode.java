@@ -27,7 +27,10 @@ public enum ErrorCode {
     MEMBER_NICKNAME_DUPLICATED(HttpStatus.CONFLICT, "MEMBER4092", "이미 사용 중인 닉네임입니다."),
 
     // 평점: 동시 등록이 DB UNIQUE에 막혀도 서비스의 사전 검사와 같은 code로 응답한다
-    RATING_DUPLICATED(HttpStatus.CONFLICT, "RATING409_1", "이미 이 영화에 평점을 남기셨습니다.");
+    RATING_DUPLICATED(HttpStatus.CONFLICT, "RATING409_1", "이미 이 영화에 평점을 남기셨습니다."),
+
+    // 즐겨찾기: 동시 등록이 DB UNIQUE에 막혀도 서비스의 사전 검사와 같은 code로 응답한다
+    FAVORITE_DUPLICATED(HttpStatus.CONFLICT, "FAVORITE409_1", "이미 즐겨찾기한 영화입니다.");
 
     private final HttpStatus status;
     private final String code;

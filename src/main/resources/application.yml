@@ -1,4 +1,6 @@
 spring:
+  application:
+    name: umc-movie
   config:
     # 프로젝트 루트의 .env(깃에 올리지 않는다)를 설정으로 읽는다. 없어도 실행 환경 변수를 쓰면 된다.
     import: optional:file:.env[.properties]
@@ -28,3 +30,20 @@ app:
 jwt:
   secret: ${JWT_SECRET} # 서명에 쓸 비밀키. 코드에 직접 쓰지 않는다. (32자 이상)
   access-expiration: ${JWT_ACCESS_EXPIRATION} # 토큰 유효시간(초)
+
+# 컨테이너의 9091은 호스트 루프백에만 게시한다. ALB 대상 포트는 8080이다.
+management:
+  server:
+    port: 9091
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 50ms,100ms,200ms,300ms,500ms,800ms,1500ms,3s

@@ -56,7 +56,7 @@
 | --- | --- |
 | 스택 | 🍃 Spring Boot 3.5 · Java 21 · MySQL 8.4 |
 | 저장소 / 브랜치 | https://github.com/seoktae-lee/umc-movie · `feature/week-10` |
-| Pull Request | (PR 링크) |
+| Pull Request | https://github.com/seoktae-lee/umc-movie/pull/4 |
 | 배포 주소 | `http://52.64.68.67:8080` |
 | 리전 / 리소스 | ap-southeast-2 · EC2 t3.micro(Amazon Linux 2023) · RDS MySQL 8.4 db.t4g.micro 20GB(gp3, 암호화) · S3(비공개, JAR 전달용) · SSM Parameter Store |
 

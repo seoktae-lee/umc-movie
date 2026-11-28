@@ -50,7 +50,8 @@ fi
 aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null || \
   aws s3api create-bucket --bucket "$BUCKET" --create-bucket-configuration LocationConstraint="$REGION" >/dev/null
 aws s3api put-public-access-block --bucket "$BUCKET" --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
-java -version 2>&1 | grep -q "\"21" || sudo dnf install -y -q java-21-amazon-corretto-devel
+# CloudShell 기본 java는 컴파일러(javac)가 없는 JRE라 Gradle toolchain이 못 찾는다. JDK를 설치한다.
+[[ -x /usr/lib/jvm/java-21-amazon-corretto/bin/javac ]] || sudo dnf install -y -q java-21-amazon-corretto-devel
 JAVA_HOME=/usr/lib/jvm/java-21-amazon-corretto ./gradlew clean bootJar -q
 aws s3 cp build/libs/movie-0.0.1-SNAPSHOT.jar "s3://$BUCKET/movie.jar"
 aws s3 cp docs/sql/10_prod_schema.sql "s3://$BUCKET/schema.sql"

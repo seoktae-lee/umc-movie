@@ -1,0 +1,65 @@
+# 배포 서버 http://52.64.68.67:8080 점검
+## Standard: 회원가입 → 로그인 → 401/200 → 평점 → 즐겨찾기
+$ POST /members  body={"email": "w10.1037f9@example.com", "password": "***", "nickname": "w101037f9"}
+→ 201 {"isSuccess": true, "code": "COMMON201", "message": "회원가입에 성공했습니다.", "result": {"memberId": 1, "email": "w10.1037f9@example.com", "nickname": "w101037f9"}}
+
+$ POST /auth/login  body={"email": "w10.1037f9@example.com", "password": "***"}
+→ 200 {"isSuccess": true, "code": "COMMON200", "message": "로그인에 성공했습니다.", "result": {"nickname": "w101037f9", "accessToken": "***"}}
+
+$ GET /members/me
+→ 401 {"isSuccess": false, "code": "AUTH401_2", "message": "로그인이 필요한 요청입니다.", "result": null}
+
+$ GET /members/me (Authorization: Bearer ***)
+→ 200 {"isSuccess": true, "code": "COMMON200", "message": "회원 정보를 조회했습니다.", "result": {"email": "w10.1037f9@example.com", "nickname": "w101037f9", "createdAt": "2026-11-28T14:14:44"}}
+
+$ POST /ratings (Authorization: Bearer ***)  body={"movieId": 27205, "score": 5, "comment": "week10 배포 확인"}
+→ 201 {"isSuccess": true, "code": "COMMON201", "message": "평점을 등록했습니다.", "result": {"ratingId": 1, "movieId": 27205, "score": 5, "comment": "week10 배포 확인", "createdAt": "2026-11-28T14:14:54", "updatedAt": "2026-11-28T14:14:54"}}
+
+$ GET /members/1/ratings
+→ 200 [{"ratingId": 1, "movieId": 27205, "score": 5, "comment": "week10 배포 확인", "createdAt": "2026-11-28T14:14:54", "updatedAt": "2026-11-28T14:14:54"}]
+
+$ GET /favorites (Authorization: Bearer ***)
+→ 200 {"isSuccess": true, "code": "COMMON200", "message": "즐겨찾기 목록을 조회했습니다.", "result": []}
+
+$ POST /favorites (Authorization: Bearer ***)  body={"movieId": 27205}
+→ 201 {"isSuccess": true, "code": "COMMON201", "message": "즐겨찾기를 등록했습니다.", "result": {"favoriteId": 1, "movieId": 27205, "createdAt": "2026-11-28T14:15:02"}}
+
+$ GET /favorites/27205 (Authorization: Bearer ***)
+→ 200 {"isSuccess": true, "code": "COMMON200", "message": "즐겨찾기 여부를 조회했습니다.", "result": {"isFavorite": true}}
+
+$ GET /favorites (Authorization: Bearer ***)
+→ 200 {"isSuccess": true, "code": "COMMON200", "message": "즐겨찾기 목록을 조회했습니다.", "result": [{"favoriteId": 1, "movieId": 27205, "createdAt": "2026-11-28T14:15:02"}]}
+
+$ POST /favorites (Authorization: Bearer ***)  body={"movieId": 27205}
+→ 409 {"isSuccess": false, "code": "FAVORITE409_1", "message": "이미 즐겨찾기한 영화입니다.", "result": null}
+
+## CORS (프리플라이트)
+$ OPTIONS /favorites  Origin: http://localhost:5173
+→ 200  Access-Control-Allow-Origin: http://localhost:5173
+
+$ OPTIONS /favorites  Origin: http://evil.example
+→ 403  Access-Control-Allow-Origin: (없음)
+
+## Challenge: POST /movie-records 정상/실패와 부분 저장 확인
+$ POST /movie-records (Authorization: Bearer ***)  body={"movieId": 157336, "score": 4, "comment": "정상 요청", "addToFavorites": true}
+→ 201 {"isSuccess": true, "code": "COMMON201", "message": "영화 기록을 저장했습니다.", "result": {"rating": {"ratingId": 2, "movieId": 157336, "score": 4, "comment": "정상 요청", "createdAt": "2026-11-28T14:15:08", "updatedAt": "2026-11-28T14:15:08"}, "favorite": {"favoriteId": 2, "movieId": 157336, "createdAt": "2026-11-28T14:15:08"}}}
+
+$ GET /favorites/157336 (Authorization: Bearer ***)
+→ 200 {"isSuccess": true, "code": "COMMON200", "message": "즐겨찾기 여부를 조회했습니다.", "result": {"isFavorite": true}}
+
+# 실패 준비: 155(다크 나이트)를 먼저 즐겨찾기 → 평점+즐겨찾기 통합 저장은 즐겨찾기 단계에서 409
+$ POST /favorites (Authorization: Bearer ***)  body={"movieId": 155}
+→ 201 {"isSuccess": true, "code": "COMMON201", "message": "즐겨찾기를 등록했습니다.", "result": {"favoriteId": 3, "movieId": 155, "createdAt": "2026-11-28T14:15:10"}}
+
+$ POST /movie-records (Authorization: Bearer ***)  body={"movieId": 155, "score": 3, "comment": "실패해야 함", "addToFavorites": true}
+→ 409 {"isSuccess": false, "code": "FAVORITE409_1", "message": "이미 즐겨찾기한 영화입니다.", "result": null}
+
+$ GET /members/1/ratings
+→ 200 [{"ratingId": 2, "movieId": 157336, "score": 4, "comment": "정상 요청", "createdAt": "2026-11-28T14:15:08", "updatedAt": "2026-11-28T14:15:08"}, {"ratingId": 1, "movieId": 27205, "score": 5, "comment": "week10 배포 확인", "createdAt": "2026-11-28T14:14:54", "updatedAt": "2026-11-28T14:14:54"}]
+
+# 155 평점이 남았나? → 없음(롤백 성공); 저장된 평점 movieId 목록 = [157336, 27205]
+
+## EC2 재부팅 후 (SSH·세션과 무관하게 systemd로 자동 시작)
+$ aws ec2 reboot-instances --instance-ids i-0b68094ba8ef3b55e   (14:15:40 UTC)
+$ curl http://52.64.68.67:8080/members/nickname/w10check → 14:18:19 UTC 200
+$ GET /members/1/ratings → 재부팅 전과 같은 평점 [157336, 27205] (데이터는 RDS에 있음)

@@ -20,3 +20,8 @@ spring:
 jwt:
   secret: test-secret-for-integration-tests-only-32-chars
   access-expiration: 3600
+
+# 10주차: CORS 허용 목록은 프로필별 파일로 옮겼으므로 테스트 프로필에도 둔다.
+app:
+  cors:
+    allowed-origins: http://localhost:5173

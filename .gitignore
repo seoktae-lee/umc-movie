@@ -38,3 +38,7 @@ out/
 
 ### 로컬 비밀값 ###
 .env
+.env.*
+!.env.example
+!.env.production.example
+*.pem
